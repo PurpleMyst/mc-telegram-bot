@@ -5,6 +5,7 @@ description = "Telegram bot to manage MC servers"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "mcstatus>=11.1.1",
     "platformdirs>=4.3.6",
     "pretty-errors>=1.2.25",
     "python-dotenv>=1.0.1",

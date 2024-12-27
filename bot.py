@@ -10,8 +10,10 @@ import platformdirs
 import pretty_errors as _
 from colorama import Fore, Style
 from dotenv import load_dotenv
+from mcstatus import JavaServer
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, PicklePersistence
+from telegram.helpers import escape_markdown
 
 
 class ColorFormatter(logging.Formatter):
@@ -211,6 +213,51 @@ async def server_ip(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"🌐 L'indirizzo IP del server è: {public_ip}")
 
 
+async def server_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    assert context.bot_data is not None
+    assert update.message is not None
+    assert update.effective_user is not None
+
+    user_id = update.effective_user.id
+
+    if user_id not in context.bot_data.get("users", set()):
+        logger.warning(
+            f"User {user_id} tried to access the server status without unlocking the bot"
+        )
+        await update.message.reply_text("🔒 Devi sbloccare il bot per poter usare questo comando.")
+        return
+
+    try:
+        server = JavaServer("localhost", 25565)
+        status = server.status()
+    except Exception as e:
+        logger.error(f"Error getting the server status: {e}")
+        await update.message.reply_text("❌ Errore nel recupero dello stato del server.")
+        return
+
+    logger.info(f"User {user_id} has requested the server status, which is {status!r}")
+    await update.message.reply_text(status_message(status), parse_mode="Markdown")
+
+
+def status_message(status) -> str:
+    msg_lines = ["🟢 Il server è online!"]
+
+    if status.players.sample:
+        msg_lines.append("👥 Giocatori online: ")
+        msg_lines.extend(
+            f"  - {escape_markdown(player.name)} ({escape_markdown(player.id)})"
+            for player in status.players.sample
+        )
+    elif status.players.online:
+        msg_lines.append(f"👥 Giocatori online: {status.players.online}")
+    else:
+        msg_lines.append("👥 Nessun giocatore online.")
+
+    msg_lines.append(f"🕒 Latenza: {status.latency} ms")
+
+    return "\n".join(msg_lines)
+
+
 async def help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     assert context.bot_data is not None
     assert update.message is not None
@@ -223,11 +270,21 @@ async def help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🔒 Devi sbloccare il bot per poter usare questo comando.")
         return
 
+    commands = [
+        ("start", "Sblocca il bot"),
+        ("start_server", "Avvia il server"),
+        ("stop_server", "Arresta il server"),
+        ("server_ip", "Mostra l'indirizzo IP del server"),
+        ("server_status", "Mostra lo stato del server"),
+    ]
+
     await update.message.reply_text(
-        "ℹ️ Questo bot ti permette di avviare e arrestare un server Minecraft. "
-        "Per iniziare, scrivi /start per sbloccare il bot. "
-        "Dopo averlo sbloccato, puoi avviare il server con /start_server e arrestarlo con /stop_server."
+        "ℹ️ Questo bot ti permette di gestire un server Minecraft. "
+        "Ecco i comandi disponibili:\n"
+        + "\n".join(f"  - /{command}: {description}" for command, description in commands)
     )
+
+    await context.bot.set_my_commands(commands)
 
 
 def main():
@@ -256,6 +313,7 @@ def main():
         "start_server": start_server,
         "stop_server": stop_server,
         "server_ip": server_ip,
+        "server_status": server_status,
         "help": help,
     }
 
