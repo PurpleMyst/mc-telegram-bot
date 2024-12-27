@@ -39,34 +39,30 @@ class ColorFormatter(logging.Formatter):
         # Add color to the timestamp
         timestamp = self.formatTime(record, self.datefmt)
 
-        record.message = record.getMessage()  # Populate the message field
-        formatted_message = f"{Fore.MAGENTA}{timestamp}{Style.RESET_ALL} - {record.name} - {record.levelname} - {record.message}"
+        # Populate the message field
+        record.message = record.getMessage()
+
+        # Format the log message ourselves, to avoid depending on asctime.
+        formatted_message = " - ".join(
+            (
+                f"{Fore.MAGENTA}{timestamp}{Style.RESET_ALL}",
+                record.name,
+                record.levelname,
+                record.message,
+            )
+        )
         return formatted_message
 
 
 def compress_log_file(log_file_path):
-    """
-    Compress a log file using gzip.
-
-    Args:
-        log_file_path (str): The path to the log file to compress.
-    """
-    if os.path.exists(log_file_path):
-        with open(log_file_path, "rb") as f_in:
-            with gzip.open(f"{log_file_path}.gz", "wb") as f_out:
-                f_out.writelines(f_in)
-        os.remove(log_file_path)  # Remove the uncompressed log file
+    if not os.path.exists(log_file_path):
+        return
+    with open(log_file_path, "rb") as f_in, gzip.open(f"{log_file_path}.gz", "wb") as f_out:
+        f_out.writelines(f_in)
+    os.remove(log_file_path)  # Remove the uncompressed log file
 
 
 def setup_global_logging():
-    """
-    Set up global logging configuration for all loggers.
-
-    Args:
-        log_file (str): File path for persistent logs.
-        level (int): Logging level (e.g., logging.DEBUG, logging.INFO).
-    """
-
     log_file = (
         Path(platformdirs.user_log_dir("mc_telegram_bot", "PurpleMyst", ensure_exists=True))
         / "bot.log"
@@ -192,6 +188,29 @@ async def stop_server(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🛑 Server arrestato con successo!")
 
 
+async def server_ip(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    assert context.bot_data is not None
+    assert update.message is not None
+    assert update.effective_user is not None
+
+    user_id = update.effective_user.id
+
+    if user_id not in context.bot_data.get("users", set()):
+        logger.warning(f"User {user_id} tried to access the public IP without unlocking the bot")
+        await update.message.reply_text("🔒 Devi sbloccare il bot per poter usare questo comando.")
+        return
+
+    try:
+        public_ip = subprocess.check_output(["curl", "-s", "ifconfig.me"]).decode().strip()
+    except Exception as e:
+        logger.error(f"Error getting the public IP: {e}")
+        await update.message.reply_text("❌ Errore nel recupero dell'indirizzo IP pubblico.")
+        return
+    else:
+        logger.info(f"User {user_id} has requested the public IP, which is {public_ip}")
+        await update.message.reply_text(f"🌐 L'indirizzo IP del server è: {public_ip}")
+
+
 async def help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     assert context.bot_data is not None
     assert update.message is not None
@@ -232,17 +251,17 @@ def main():
         .build()
     )
 
-    start_handler = CommandHandler("start", start)
-    application.add_handler(start_handler)
+    commands = {
+        "start": start,
+        "start_server": start_server,
+        "stop_server": stop_server,
+        "server_ip": server_ip,
+        "help": help,
+    }
 
-    start_server_handler = CommandHandler("start_server", start_server)
-    application.add_handler(start_server_handler)
-
-    stop_server_handler = CommandHandler("stop_server", stop_server)
-    application.add_handler(stop_server_handler)
-
-    help_handler = CommandHandler("help", help)
-    application.add_handler(help_handler)
+    handlers = [CommandHandler(command, callback) for command, callback in commands.items()]
+    for handler in handlers:
+        application.add_handler(handler)
 
     application.run_polling()
 
