@@ -20,11 +20,12 @@ fi
 echo $$ > "$LOCK_FILE"
 
 # Navigate to the server folder
-cd /path/to/server/folder || { echo "Failed to navigate to server folder"; exit 1; }
+cd /Users/giuseppe/Desktop/IV-1.20.1-Serverpack-1.8  || { echo "Failed to navigate to server folder"; exit 1; }
 
 # Start the Minecraft server
+# NB: run.sh must be modified to replace the shell process with the java process, otherwise stop_server.sh does not work.
 echo "Starting Minecraft server..."
-java -Xmx1024M -Xms1024M -jar server.jar nogui >> server.log 2>&1 &
+sh run.sh &
 
 # Get the process ID of the server and store it in the lock file
 SERVER_PID=$!

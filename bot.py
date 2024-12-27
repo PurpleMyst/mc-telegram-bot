@@ -157,7 +157,7 @@ async def start_server(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     try:
-        subprocess.Popen(["bash", Path(__file__).parent / "start_server.sh"], check=True)
+        subprocess.Popen(["bash", Path(__file__).parent / "start_server.sh"])
     except Exception as e:
         logger.error(f"Error starting the server: {e}")
         await update.message.reply_text("❌ Errore nell'avvio del server.")
@@ -182,7 +182,7 @@ async def stop_server(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     try:
-        subprocess.Popen(["bash", Path(__file__).parent / "stop_server.sh"], check=True)
+        subprocess.Popen(["bash", Path(__file__).parent / "stop_server.sh"])
     except Exception as e:
         logger.error(f"Error stopping the server: {e}")
         await update.message.reply_text("❌ Errore nell'arresto del server.")
