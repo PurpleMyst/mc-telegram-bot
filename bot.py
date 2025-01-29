@@ -114,7 +114,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     assert update.message is not None
     assert update.effective_user is not None
 
-    user_id = update.effective_user.id
+    user = update.effective_user
+    user_id = user.id
+    username = user.username if user.username else f"User_{user_id}"
 
     if user_id in context.bot_data.get("users", set()):
         await update.message.reply_text("👋 Ciao! Sei già sbloccato.")
@@ -123,17 +125,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     match context.args:
         case [key]:
             if key != os.getenv("SECRET_KEY"):
-                logger.warning(f"Invalid secret key {key} from user {user_id}")
+                logger.warning(f"Invalid secret key {key} from user {username} (id: {user_id})")
                 await update.message.reply_text("🔒 Chiave segreta errata. Riprova.")
                 return
 
             if update.effective_user is not None:
-                logger.info(f"User {user_id} has unlocked the bot")
+                logger.info(f"User {username} (id: {user_id}) has unlocked the bot")
                 await update.message.reply_text("🔓 Benvenuto! Ora puoi usare il bot.")
                 context.bot_data.setdefault("users", set()).add(user_id)
 
         case _:
-            logger.info(f"User {user_id} tried to access the bot without a secret key")
+            logger.info(f"User {username} (id: {user_id}) tried to access the bot without a secret key")
             await update.message.reply_text(
                 "Ciao! Per usare questo bot, devi conoscere la chiave segreta. "
                 "Scrivila dopo il comando /start 🤫🔑"
@@ -145,10 +147,12 @@ async def start_server(update: Update, context: ContextTypes.DEFAULT_TYPE):
     assert update.message is not None
     assert update.effective_user is not None
 
-    user_id = update.effective_user.id
+    user = update.effective_user
+    user_id = user.id
+    username = user.username if user.username else f"User_{user_id}"
 
     if user_id not in context.bot_data.get("users", set()):
-        logger.warning(f"User {user_id} tried to start the server without unlocking the bot")
+        logger.warning(f"User {username} (id: {user_id}) tried to start the server without unlocking the bot")
         await update.message.reply_text(
             "🔒 Devi sbloccare il bot prima di poter avviare il server."
         )
@@ -161,8 +165,16 @@ async def start_server(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Errore nell'avvio del server.")
         return
     else:
-        logger.info(f"User {user_id} has started the server")
+        logger.info(f"User {username} (id: {user_id}) has started the server")
         await update.message.reply_text("🚀 Server avviato con successo!")
+        try:
+            public_ip = subprocess.check_output(["curl", "-s", "ifconfig.me"]).decode().strip()
+        except Exception as e:
+            logger.error(f"Error getting the public IP: {e}")
+            await update.message.reply_text("❌ Errore nel recupero dell'indirizzo IP pubblico.")
+            return
+        logger.info(f"User {username} (id: {user_id}) has requested the public IP, which is {public_ip}")
+        await update.message.reply_text(f"🌐 L'indirizzo IP del server è: {public_ip}")
 
 
 async def stop_server(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -170,10 +182,12 @@ async def stop_server(update: Update, context: ContextTypes.DEFAULT_TYPE):
     assert update.message is not None
     assert update.effective_user is not None
 
-    user_id = update.effective_user.id
+    user = update.effective_user
+    user_id = user.id
+    username = user.username if user.username else f"User_{user_id}"
 
     if user_id not in context.bot_data.get("users", set()):
-        logger.warning(f"User {user_id} tried to stop the server without unlocking the bot")
+        logger.warning(f"User {username} (id: {user_id}) tried to stop the server without unlocking the bot")
         await update.message.reply_text(
             "🔒 Devi sbloccare il bot prima di poter arrestare il server."
         )
@@ -186,7 +200,7 @@ async def stop_server(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Errore nell'arresto del server.")
         return
     else:
-        logger.info(f"User {user_id} has stopped the server")
+        logger.info(f"User {username} (id: {user_id}) has stopped the server")
         await update.message.reply_text("🛑 Server arrestato con successo!")
 
 
@@ -195,10 +209,12 @@ async def server_ip(update: Update, context: ContextTypes.DEFAULT_TYPE):
     assert update.message is not None
     assert update.effective_user is not None
 
-    user_id = update.effective_user.id
+    user = update.effective_user
+    user_id = user.id
+    username = user.username if user.username else f"User_{user_id}"
 
     if user_id not in context.bot_data.get("users", set()):
-        logger.warning(f"User {user_id} tried to access the public IP without unlocking the bot")
+        logger.warning(f"User {username} (id: {user_id}) tried to access the public IP without unlocking the bot")
         await update.message.reply_text("🔒 Devi sbloccare il bot per poter usare questo comando.")
         return
 
@@ -209,7 +225,7 @@ async def server_ip(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Errore nel recupero dell'indirizzo IP pubblico.")
         return
     else:
-        logger.info(f"User {user_id} has requested the public IP, which is {public_ip}")
+        logger.info(f"User {username} (id: {user_id}) has requested the public IP, which is {public_ip}")
         await update.message.reply_text(f"🌐 L'indirizzo IP del server è: {public_ip}")
 
 
@@ -218,11 +234,13 @@ async def server_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     assert update.message is not None
     assert update.effective_user is not None
 
-    user_id = update.effective_user.id
+    user = update.effective_user
+    user_id = user.id
+    username = user.username if user.username else f"User_{user_id}"
 
     if user_id not in context.bot_data.get("users", set()):
         logger.warning(
-            f"User {user_id} tried to access the server status without unlocking the bot"
+            f"User {username} (id: {user_id}) tried to access the server status without unlocking the bot"
         )
         await update.message.reply_text("🔒 Devi sbloccare il bot per poter usare questo comando.")
         return
@@ -235,7 +253,7 @@ async def server_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Errore nel recupero dello stato del server.")
         return
 
-    logger.info(f"User {user_id} has requested the server status, which is {status!r}")
+    logger.info(f"User {username} (id: {user_id}) has requested the server status, which is {status!r}")
     await update.message.reply_text(status_message(status), parse_mode="Markdown")
 
 
@@ -257,16 +275,62 @@ def status_message(status) -> str:
 
     return "\n".join(msg_lines)
 
-
-async def help(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     assert context.bot_data is not None
     assert update.message is not None
     assert update.effective_user is not None
 
-    user_id = update.effective_user.id
+    user = update.effective_user
+    user_id = user.id
+    username = user.username if user.username else f"User_{user_id}"
+
+    # Verifica che l'utente abbia sbloccato il bot
+    if user_id not in context.bot_data.get("users", set()):
+        logger.warning(f"User {username} (id: {user_id}) tried to use /broadcast without unlocking the bot")
+        await update.message.reply_text("🔒 Devi sbloccare il bot per usare questo comando.")
+        return
+
+    # Rimuovi il comando e ottieni il messaggio completo
+    if update.message.text is None or not update.message.text.strip():
+        await update.message.reply_text("❌ Devi fornire un messaggio da inviare. Usa: /broadcast <messaggio>")
+        return
+
+    # Estrarre il messaggio dopo il comando
+    message = update.message.text[len("/broadcast "):].strip()
+
+    if not message:
+        await update.message.reply_text("❌ Il messaggio non può essere vuoto. Usa: /broadcast <messaggio>")
+        return
+
+    logger.info(f"User {username} (id: {user_id}) is broadcasting: {message}")
+
+    # Invia il messaggio a tutti gli utenti
+    failed = []
+    for user in context.bot_data.get("users", set()):
+        try:
+            await context.bot.send_message(chat_id=user, text=message)
+        except Exception as e:
+            logger.error(f"Error sending broadcast to {user}: {e}")
+            failed.append(user)
+
+    # Notifica l'utente sul risultato del broadcast
+    if failed:
+        await update.message.reply_text(f"✅ Messaggio inviato. ❌ Impossibile inviare a {len(failed)} utenti.")
+    else:
+        await update.message.reply_text("✅ Messaggio inviato a tutti gli utenti!")
+
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    assert context.bot_data is not None
+    assert update.message is not None
+    assert update.effective_user is not None
+
+    user = update.effective_user
+    user_id = user.id
+    username = user.username if user.username else f"User_{user_id}"
 
     if user_id not in context.bot_data.get("users", set()):
-        logger.warning(f"User {user_id} tried to access the help command without unlocking the bot")
+        logger.warning(f"User {username} (id: {user_id}) tried to access the help command without unlocking the bot")
         await update.message.reply_text("🔒 Devi sbloccare il bot per poter usare questo comando.")
         return
 
@@ -276,6 +340,7 @@ async def help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ("stop_server", "Arresta il server"),
         ("server_ip", "Mostra l'indirizzo IP del server"),
         ("server_status", "Mostra lo stato del server"),
+        ("broadcast", "Invia un messaggio a tutti gli utenti del bot"),
     ]
 
     await update.message.reply_text(
@@ -314,7 +379,8 @@ def main():
         "stop_server": stop_server,
         "server_ip": server_ip,
         "server_status": server_status,
-        "help": help,
+        "help": help_command,
+        "broadcast": broadcast,
     }
 
     handlers = [CommandHandler(command, callback) for command, callback in commands.items()]
